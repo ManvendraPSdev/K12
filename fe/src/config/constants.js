@@ -58,4 +58,4 @@ export const STATUS_COLORS = {
 };
 
 export const DEFAULT_PAGE_LIMIT = 10;
-export const PAGE_LIMIT_OPTIONS = [10, 20, 50];
+export const PAGE_LIMIT_OPTIONS = [5, 10, 25, 50];
