@@ -1,8 +1,12 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import apiClient from '../../services/apiClient';
+import authService from '../../services/authService.js';
 
-// Helper to get safely stored initial state
+// Helper to safely load stored credentials
 const getInitialStoredAuth = () => {
+  if (typeof localStorage === 'undefined') {
+    return { token: null, admin: null, isAuthenticated: false };
+  }
+
   const token = localStorage.getItem('token');
   let admin = null;
   try {
@@ -11,7 +15,8 @@ const getInitialStoredAuth = () => {
       admin = JSON.parse(storedAdmin);
     }
   } catch (err) {
-    console.error('Failed to parse stored admin object', err);
+    console.error('Failed to parse stored admin object:', err);
+    localStorage.removeItem('admin');
   }
 
   return {
@@ -27,20 +32,31 @@ export const loginAdmin = createAsyncThunk(
   'auth/loginAdmin',
   async ({ email, password }, { rejectWithValue }) => {
     try {
-      const response = await apiClient.post('/auth/login', { email, password });
-      const { admin, token } = response.data.data;
+      const response = await authService.login({
+        email: email.trim().toLowerCase(),
+        password,
+      });
 
-      // Persist token and admin info in localStorage (passwords are NEVER stored)
+      const { admin, token } = response.data;
+
+      // Store JWT and public admin info in localStorage (never passwords)
       localStorage.setItem('token', token);
       localStorage.setItem('admin', JSON.stringify(admin));
 
       return { admin, token };
     } catch (error) {
-      const message =
-        error.response?.data?.message ||
-        (error.response?.status === 429
-          ? 'Too many login attempts. Please wait a few minutes and try again.'
-          : 'Login failed. Please check your credentials.');
+      const status = error.response?.status;
+      const data = error.response?.data;
+
+      let message = 'Login failed. Please verify your credentials.';
+      if (status === 401) {
+        message = data?.message || 'Invalid email or password.';
+      } else if (status === 429) {
+        message = data?.message || 'Too many login attempts. Please wait a few minutes before trying again.';
+      } else if (data?.message) {
+        message = data.message;
+      }
+
       return rejectWithValue(message);
     }
   },
@@ -50,26 +66,30 @@ export const fetchCurrentAdmin = createAsyncThunk(
   'auth/fetchCurrentAdmin',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await apiClient.get('/auth/me');
-      const { admin } = response.data.data;
+      const response = await authService.getMe();
+      const { admin } = response.data;
       localStorage.setItem('admin', JSON.stringify(admin));
       return { admin };
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch admin profile');
+      // Clear invalid/expired session
+      localStorage.removeItem('token');
+      localStorage.removeItem('admin');
+      const message = error.response?.data?.message || 'Session expired. Please log in again.';
+      return rejectWithValue(message);
     }
   },
 );
 
 export const logoutAdmin = createAsyncThunk(
   'auth/logoutAdmin',
-  async (_, { dispatch }) => {
+  async () => {
     try {
-      // Notify backend if token exists
-      await apiClient.post('/auth/logout');
+      // Backend stateless logout notification
+      await authService.logout();
     } catch (error) {
-      // Ignore network errors on logout since token is stateless
-      console.warn('Backend logout response error (ignored):', error);
+      console.warn('Stateless backend logout call completed with notice:', error.message);
     } finally {
+      // Ensure client storage is always cleared
       localStorage.removeItem('token');
       localStorage.removeItem('admin');
     }
@@ -83,6 +103,7 @@ const authSlice = createSlice({
     admin: initialStored.admin,
     isAuthenticated: initialStored.isAuthenticated,
     loading: false,
+    isCheckingAuth: Boolean(initialStored.token), // true if token needs verification on startup
     error: null,
   },
   reducers: {
@@ -94,6 +115,7 @@ const authSlice = createSlice({
       state.admin = null;
       state.isAuthenticated = false;
       state.loading = false;
+      state.isCheckingAuth = false;
       state.error = null;
       localStorage.removeItem('token');
       localStorage.removeItem('admin');
@@ -120,24 +142,39 @@ const authSlice = createSlice({
         state.admin = null;
         state.error = action.payload;
       })
-      // Current Admin profile check
+      // Current Admin verification
+      .addCase(fetchCurrentAdmin.pending, (state) => {
+        state.isCheckingAuth = true;
+      })
       .addCase(fetchCurrentAdmin.fulfilled, (state, action) => {
+        state.isCheckingAuth = false;
+        state.isAuthenticated = true;
         state.admin = action.payload.admin;
       })
       .addCase(fetchCurrentAdmin.rejected, (state) => {
-        // If profile fetch fails with invalid token, reset auth
+        state.isCheckingAuth = false;
         state.isAuthenticated = false;
         state.token = null;
         state.admin = null;
-        localStorage.removeItem('token');
-        localStorage.removeItem('admin');
       })
-      // Logout
+      // Logout (fulfilled or rejected)
+      .addCase(logoutAdmin.pending, (state) => {
+        state.loading = true;
+      })
       .addCase(logoutAdmin.fulfilled, (state) => {
         state.token = null;
         state.admin = null;
         state.isAuthenticated = false;
         state.loading = false;
+        state.isCheckingAuth = false;
+        state.error = null;
+      })
+      .addCase(logoutAdmin.rejected, (state) => {
+        state.token = null;
+        state.admin = null;
+        state.isAuthenticated = false;
+        state.loading = false;
+        state.isCheckingAuth = false;
         state.error = null;
       });
   },

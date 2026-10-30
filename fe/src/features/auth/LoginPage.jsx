@@ -1,43 +1,53 @@
-import { Link } from 'react-router-dom';
-import { Lock, ArrowLeft, ShieldCheck } from 'lucide-react';
+import { useSelector } from 'react-redux';
+import { Navigate, useLocation, Link } from 'react-router-dom';
+import { Shield, ArrowLeft, Loader2 } from 'lucide-react';
+import LoginForm from './LoginForm';
 
 export default function LoginPage() {
+  const { isAuthenticated, token, isCheckingAuth } = useSelector((state) => state.auth);
+  const location = useLocation();
+
+  const destination = location.state?.from?.pathname || '/admin';
+
+  // 1. Show loader while checking startup session
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-[420px] flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto" />
+          <p className="text-xs text-slate-500 font-medium">Checking administrative session...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Redirect already authenticated users away from /login to /admin
+  if (isAuthenticated && token) {
+    return <Navigate to={destination} replace />;
+  }
+
   return (
-    <div className="max-w-md mx-auto py-12 px-4">
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8 space-y-6">
+    <div className="max-w-md mx-auto py-8 sm:py-12 px-4">
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 sm:p-8 space-y-6">
         <div className="text-center space-y-2">
-          <div className="w-12 h-12 bg-indigo-50 border border-indigo-100 rounded-2xl flex items-center justify-center mx-auto text-indigo-600">
-            <Lock className="w-6 h-6" />
+          <div className="w-12 h-12 bg-indigo-50 border border-indigo-100 rounded-2xl flex items-center justify-center mx-auto text-indigo-600 shadow-sm">
+            <Shield className="w-6 h-6" />
           </div>
-          <h2 className="text-2xl font-bold text-slate-900">Admin Portal</h2>
-          <p className="text-sm text-slate-500">
-            Shell page ready. Authentication form and Bearer JWT integration will be finalized in Phase 6B.
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Admin Portal</h1>
+          <p className="text-xs sm:text-sm text-slate-500">
+            Sign in with administrative credentials to manage inquiries, update statuses, and review CRM data.
           </p>
         </div>
 
-        <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 space-y-1">
-          <div className="flex items-center space-x-1.5 font-semibold text-slate-700">
-            <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            <span>Auth State Configuration:</span>
-          </div>
-          <p>• Redux auth slice configured with loginAdmin thunk.</p>
-          <p>• Axios Bearer token interceptors active.</p>
-          <p>• Token stored in localStorage (passwords never stored).</p>
-        </div>
+        <LoginForm />
 
-        <div className="flex justify-between items-center pt-2">
+        <div className="pt-4 border-t border-slate-100 text-center">
           <Link
             to="/"
-            className="inline-flex items-center space-x-1 text-sm text-slate-600 hover:text-indigo-600"
+            className="inline-flex items-center space-x-1.5 text-xs text-slate-500 hover:text-indigo-600 transition"
           >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back to Public View</span>
-          </Link>
-          <Link
-            to="/admin"
-            className="text-sm font-semibold text-indigo-600 hover:text-indigo-700"
-          >
-            Test Protected Route &rarr;
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Return to Public Inquiry Portal</span>
           </Link>
         </div>
       </div>
