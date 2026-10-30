@@ -1,0 +1,63 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserType {
+  PARENT
+  STUDENT
+  SCHOOL
+
+  @@map("user_type")
+}
+
+enum InquiryCategory {
+  SCHOLARSHIP
+  CONCERT
+  ADMISSION
+  GENERAL_QUERY
+
+  @@map("inquiry_category")
+}
+
+enum InquiryStatus {
+  PENDING
+  IN_PROGRESS
+  RESOLVED
+
+  @@map("inquiry_status")
+}
+
+model Admin {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("admins")
+}
+
+model Inquiry {
+  id        String          @id @default(uuid()) @db.Uuid
+  name      String
+  email     String
+  phone     String
+  userType  UserType        @map("user_type")
+  category  InquiryCategory
+  message   String          @db.Text
+  status    InquiryStatus   @default(PENDING)
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@index([userType])
+  @@index([status])
+  @@index([createdAt])
+  @@map("inquiries")
+}
