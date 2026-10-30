@@ -17,8 +17,6 @@ function errorMiddleware(err, _req, res, _next) {
     statusCode = 403;
     message = 'Origin not allowed';
     errors = [];
-  } else if (!env.isProduction && err.message) {
-    message = 'Internal server error';
   }
 
   if (env.isProduction && statusCode >= 500) {

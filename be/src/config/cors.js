@@ -6,6 +6,10 @@ const allowedOrigins = env.corsOrigin
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+if (env.isProduction && allowedOrigins.some((origin) => origin === '*')) {
+  throw new Error('CORS_ORIGIN cannot use a wildcard in production');
+}
+
 const corsOptions = {
   origin(origin, callback) {
     if (!origin) {

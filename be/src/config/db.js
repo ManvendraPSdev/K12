@@ -13,10 +13,14 @@ if (!env.isProduction) {
   globalForPrisma.prisma = prisma;
 }
 
+async function checkDatabaseHealth() {
+  await prisma.$queryRaw`SELECT 1`;
+}
+
 async function connectDatabase() {
   try {
     await prisma.$connect();
-    await prisma.$queryRaw`SELECT 1`;
+    await checkDatabaseHealth();
   } catch {
     throw new Error('Database connection failed');
   }
@@ -28,6 +32,7 @@ async function disconnectDatabase() {
 
 module.exports = {
   prisma,
+  checkDatabaseHealth,
   connectDatabase,
   disconnectDatabase,
 };
